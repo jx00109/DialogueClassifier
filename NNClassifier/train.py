@@ -9,14 +9,17 @@ import numpy as np
 
 torch.manual_seed(1)
 
+#****************************参数设置*****************************#
 EMBEDDING_DIM = 100  # 词向量维度
 HIDDEN_DIM = 100  # LSTM隐藏层维度
-EPOCH = 10000  # 训练次数
+EPOCH = 1000  # 训练次数
 EARLY_STOP = True  # 是否启用early stop
-EARLY_STOP_THRESHOLD = 8  # early stop的阈值
+EARLY_STOP_THRESHOLD = 5  # early stop的阈值
 LEARNING_RATE = 0.001  # 学习率
 VALID_RATE = 0.2  # 验证集占比
 TEST_RATE = 0.2  # 测试集占比
+#****************************************************************#
+
 
 data = u.loadPickle('../data/alldata(fixed1).pkl')
 tag12 = u.loadPickle('../data/tag12.pkl')
@@ -138,13 +141,15 @@ for epoch in range(EPOCH):
 
     # 如果分类器的准去率在验证集上多次没有提高，就early stop
     if EARLY_STOP:
+        # 如果准去率提升，earlystop计数器清零，否则自增
         if accurary >= pre_accurary:
             early_stop_count = 0
             pre_accurary = accurary
         else:
             early_stop_count += 1
 
-        if early_stop_count > EARLY_STOP_THRESHOLD:
+        if early_stop_count >= EARLY_STOP_THRESHOLD:
+            print 'Early stop!!!'
             break
 
 # 训练结束在测试集上进行测试
