@@ -1,0 +1,154 @@
+# -*- encoding:utf8 -*-
+import torch
+import torch.autograd as autograd  # torch中自动计算梯度模块
+import torch.nn as nn  # 神经网络模块
+import torch.optim as optim  # 模型优化器模块
+from lstmModel import LSTMClassifier
+import Utils as u
+import numpy as np
+
+torch.manual_seed(1)
+
+EMBEDDING_DIM = 100  # 词向量维度
+HIDDEN_DIM = 100  # LSTM隐藏层维度
+EPOCH = 10000  # 训练次数
+EARLY_STOP = True  # 是否启用early stop
+EARLY_STOP_THRESHOLD = 8  # early stop的阈值
+LEARNING_RATE = 0.001  # 学习率
+VALID_RATE = 0.2  # 验证集占比
+TEST_RATE = 0.2  # 测试集占比
+
+data = u.loadPickle('../data/alldata(fixed1).pkl')
+tag12 = u.loadPickle('../data/tag12.pkl')
+
+
+# 按照测试集/数据集=rate的比例打乱数据集
+def shuffleData(data, rate):
+    nsamples = len(data)
+
+    sidx = np.random.permutation(nsamples)
+
+    ntrain = int(np.round(nsamples * (1.0 - rate)))
+
+    train_data = [data[s] for s in sidx[:ntrain]]
+
+    test_data = [data[s] for s in sidx[ntrain:]]
+
+    return train_data, test_data
+
+
+# 将原始输入处理成torch接受的格式
+def preparexy(seq, word2ix, tag2ix):
+    idxs = [word2ix[w] for w in seq[0].split()]
+    x = idxs
+    y = tag2ix[seq[1]]
+    return x, y
+
+
+def getWord2Ix(data):
+    word2ix = {}  # 单词的索引字典
+    for sent, tag1, _, _ in data:
+        for word in sent.split():
+            if word not in word2ix:
+                word2ix[word] = len(word2ix)
+    return word2ix
+
+
+def getTag2Index(tags):
+    tag2ix = {}  # 类别的索引字典
+    for key in tags:
+        if key not in tag2ix:
+            tag2ix[key] = len(tag2ix)
+    return tag2ix
+
+
+# 训练过程中用于计算模型在验证集上的准确率
+def evaluate(data, word2ix, tag2ix, model):
+    count = .0  # 统计正确分类的样本数
+    total = .0  # 统计样本总数
+    for i in range(len(data)):
+        if data[i][1].strip() == '':
+            continue
+        testx, testy = preparexy(data[i], word2ix, tag2ix)
+        testx = autograd.Variable(torch.LongTensor(testx))
+        testout = model(testx)
+
+        predy = torch.max(testout, 1)[1].data.numpy().squeeze()
+        if predy == testy:
+            count += 1.0
+        total += 1.0
+    return count / total
+
+
+# 训练
+def train_step(data, word2ix, tag2ix, model, epoch):
+    for i in range(len(data)):
+        # 如果没有标签，就直接跳过
+        if tdata[i][1].strip() == '':
+            continue
+        if i % 250 == 0:
+            print '第%d轮, 第%d个样本' % (epoch + 1, i + 1)
+
+        # 得到输入和标签
+        x, y = preparexy(data[i], word2ix, tag2ix)
+
+        x = autograd.Variable(torch.LongTensor(x))
+        y = autograd.Variable(torch.LongTensor([y]))
+
+        out = model(x)  # (1 × 类别数目)
+
+        loss = loss_function(out, y)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+
+word2ix = getWord2Ix(data)  # 单词索引字典
+tag2ix = getTag2Index(tag12)  # 类别索引字典
+
+vocab_size = len(word2ix)  # 27003
+tags_size = len(tag2ix)  # 5
+
+# 定义模型
+model = LSTMClassifier(EMBEDDING_DIM, HIDDEN_DIM, vocab_size, tags_size)
+# 定义损失函数
+loss_function = nn.CrossEntropyLoss()  # 交叉熵损失函数
+# 定义参数优化方法
+optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+# 打散数据集合，其中20%用于测试，训练中不使用
+training_data, test_data = shuffleData(data, TEST_RATE)  # 5600 1400
+
+early_stop_count = 0  # 统计验证集上准确率连续没有提高的次数
+pre_accurary = 0.0  # 记录该次训练之前模型最好的准确率
+
+for epoch in range(EPOCH):
+
+    # 每轮训练都打乱数据集，分为训练集和验证集合
+    tdata, vdata = shuffleData(training_data, VALID_RATE)
+
+    # 在训练集上训练
+    train_step(tdata, word2ix, tag2ix, model, epoch)
+
+    # 在验证集上验证
+    accurary = evaluate(vdata, word2ix, tag2ix, model)
+
+    print '第%d轮训练后，验证集上的分类准确率：%f' % (epoch, accurary)
+
+    # 如果分类器的准去率在验证集上多次没有提高，就early stop
+    if EARLY_STOP:
+        if accurary >= pre_accurary:
+            early_stop_count = 0
+            pre_accurary = accurary
+        else:
+            early_stop_count += 1
+
+        if early_stop_count > EARLY_STOP_THRESHOLD:
+            break
+
+# 训练结束在测试集上进行测试
+test_acc = evaluate(test_data, word2ix, tag2ix, model)
+
+# 保存模型
+torch.save(model, '../trainedModel/lstmClassifier-%f.pkl' % test_acc)
