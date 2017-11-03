@@ -1,1 +1,3 @@
 ./data
+./trainedModel
+./validAPI.py
