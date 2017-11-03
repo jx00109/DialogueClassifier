@@ -65,7 +65,7 @@ def getTag2Index(tags):
     return tag2ix
 
 
-# 训练过程中用于计算模型在验证集上的准确率
+# 计算模型准确率
 def evaluate(data, word2ix, tag2ix, model):
     count = .0  # 统计正确分类的样本数
     total = .0  # 统计样本总数
@@ -139,9 +139,9 @@ for epoch in range(EPOCH):
 
     print '第%d轮训练后，验证集上的分类准确率：%f' % (epoch, accurary)
 
-    # 如果分类器的准去率在验证集上多次没有提高，就early stop
+    # 如果分类器的准确率在验证集上多次没有提高，就early stop
     if EARLY_STOP:
-        # 如果准去率提升，earlystop计数器清零，否则自增
+        # 如果准确率提升，earlystop计数器清零，否则自增
         if accurary >= pre_accurary:
             early_stop_count = 0
             pre_accurary = accurary
