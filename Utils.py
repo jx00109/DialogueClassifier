@@ -58,3 +58,8 @@ def saveAsPickle(data, outpath):
 def loadPickle(datapath):
     with open(datapath, 'rb') as f:
         return pkl.load(f)
+
+
+def saveModelAcc2txt(model, acc, outpath):
+    with open(outpath, 'a') as f:
+        f.write('%s\t%f\n' % (model, acc))
