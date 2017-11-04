@@ -1,3 +1,4 @@
 ./data
 ./trainedModel
 ./validAPI.py
+./logs
