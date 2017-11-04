@@ -22,7 +22,7 @@ class LSTMClassifier(nn.Module):
         self.init_emb()
         # self.hidden = self.init_hidden()
 
-    # 在0附件初始化词向量矩阵
+    # 在0附近初始化词向量矩阵
     def init_emb(self):
         initrange = 0.5 / self.embedding_dim
         self.word_embeddings.weight.data.uniform_(-initrange, initrange)
