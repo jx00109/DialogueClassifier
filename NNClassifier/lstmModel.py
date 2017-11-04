@@ -12,18 +12,27 @@ class LSTMClassifier(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, vocab_size, tagset_size):
         super(LSTMClassifier, self).__init__()
         self.hidden_dim = hidden_dim
-
+        self.embedding_dim = embedding_dim
         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
 
         self.lstm = nn.LSTM(embedding_dim, hidden_dim)
 
         self.hidden2tag = nn.Linear(hidden_dim, tagset_size)
+
+        self.init_emb()
         # self.hidden = self.init_hidden()
+
+    # 在0附件初始化词向量矩阵
+    def init_emb(self):
+        initrange = 0.5 / self.embedding_dim
+        self.word_embeddings.weight.data.uniform_(-initrange, initrange)
+
     '''
     def init_hidden(self):
         return (autograd.Variable(torch.zeros(1, 1, self.hidden_dim)),
                 autograd.Variable(torch.zeros(1, 1, self.hidden_dim)))
     '''
+
     def forward(self, sentence):
         embeds = self.word_embeddings(sentence)
         # x: (time_step, batch, embedding_dim)
