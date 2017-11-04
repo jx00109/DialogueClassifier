@@ -10,37 +10,45 @@ import numpy as np
 torch.manual_seed(1)
 
 # ****************************参数设置**************************** #
-EMBEDDING_DIM = 100                         # 词向量维度
-HIDDEN_DIM = 100                            # LSTM隐藏层维度
-EPOCH = 1000                                # 训练次数
-EARLY_STOP = True                           # 是否启用early stop
-EARLY_STOP_THRESHOLD = 4                    # early stop的阈值
-LEARNING_RATE = 0.001                       # 学习率
-VALID_RATE = 0.4                            # 验证集占比
-TEST_RATE = 0.2                             # 测试集占比
-TRAIN_TIMES = 10                            # 需要的模型总数
-LOG_DIR = '../logs/tag1-classifier.txt'     # 日志目录
-DATA_DIR = '../data/alldata(fixed1).pkl'    # 数据目录
-TAG_DIR = '../data/tag12.pkl'               # 分类标签来源
+EMBEDDING_DIM = 100                             # 词向量维度
+HIDDEN_DIM = 100                                # LSTM隐藏层维度
+EPOCH = 100                                     # 训练次数
+EARLY_STOP = True                               # 是否启用early stop
+EARLY_STOP_THRESHOLD = 4                        # early stop的阈值
+LEARNING_RATE = 0.001                           # 学习率
+VALID_RATE = 0.2                                # 验证集占比
+TEST_RATE = 0.2                                 # 测试集占比
+TRAIN_TIMES = 10                                # 需要的模型总数
+LOG_DIR = '../logs/tag1-classifier.txt'         # 日志目录
+DATA_DIR = '../data/alldata(fixed1).pkl'        # 数据目录
+TAG_DIR = '../data/tag12.pkl'                   # 分类标签来源
 # *************************************************************** #
 
-
-data = u.loadPickle(DATA_DIR)  # 载入数据集
-tag12 = u.loadPickle(TAG_DIR)  # 载入分类信息
-
-
-# 按照测试集/数据集=rate的比例打乱数据集
-def shuffleData(data, rate):
+# 按比例得到训练集、验证集、测试集
+def divideData(data, vrate, trate):
     nsamples = len(data)
 
     sidx = np.random.permutation(nsamples)
 
-    ntrain = int(np.round(nsamples * (1.0 - rate)))
+    nvalid = int(np.round(nsamples * vrate))    # 验证集数据量
+    ntest = int(np.round(nsamples * trate))     # 测试集数据量
+    ntrain = nsamples - nvalid - ntest          # 训练集数据量
 
     train_data = [data[s] for s in sidx[:ntrain]]
-    test_data = [data[s] for s in sidx[ntrain:]]
+    valid_data = [data[s] for s in sidx[ntrain:ntrain + nvalid]]
+    test_data = [data[s] for s in sidx[ntrain + nvalid:]]
 
-    return train_data, test_data
+    return train_data, valid_data, test_data
+
+
+# 打乱数据集
+def shuffleData(data):
+    nsamples = len(data)
+
+    sidx = np.random.permutation(nsamples)
+    newdata = [data[s] for s in sidx]
+
+    return newdata
 
 
 # 将原始输入处理成torch接受的格式
@@ -76,6 +84,7 @@ def evaluate(data, word2ix, tag2ix, model):
     for i in range(len(data)):
         if data[i][1].strip() == '':
             continue
+
         testx, testy = preparexy(data[i], word2ix, tag2ix)
         testx = autograd.Variable(torch.LongTensor(testx))
         testout = model(testx)
@@ -88,13 +97,13 @@ def evaluate(data, word2ix, tag2ix, model):
 
 
 # 训练
-def train_step(data, word2ix, tag2ix, model, epoch):
+def train_step(data, word2ix, tag2ix, model, loss_function, epoch):
     for i in range(len(data)):
         # 如果没有标签，就直接跳过
         if data[i][1].strip() == '':
             continue
         if i % 500 == 0:
-            print '第%d轮, 第%d个样本' % (epoch + 1, i + 1)
+            print '第 %d 轮, 第 %d 个样本' % (epoch + 1, i + 1)
 
         # 得到输入和标签
         x, y = preparexy(data[i], word2ix, tag2ix)
@@ -111,39 +120,42 @@ def train_step(data, word2ix, tag2ix, model, epoch):
         optimizer.step()
 
 
-word2ix = getWord2Ix(data)  # 单词索引字典
-tag2ix = getTag2Index(tag12)  # 类别索引字典
+data = u.loadPickle(DATA_DIR)  # 载入数据集
+tag12 = u.loadPickle(TAG_DIR)  # 载入分类信息
 
-vocab_size = len(word2ix)  # 27003
-tags_size = len(tag2ix)  # 5
+word2ix = getWord2Ix(data)      # 单词索引字典
+tag2ix = getTag2Index(tag12)    # 类别索引字典
+
+vocab_size = len(word2ix)       # 27003
+tags_size = len(tag2ix)         # 5
 
 for time in range(TRAIN_TIMES):
     # 定义模型
     model = LSTMClassifier(EMBEDDING_DIM, HIDDEN_DIM, vocab_size, tags_size)
     # 定义损失函数
-    loss_function = nn.CrossEntropyLoss()  # 交叉熵损失函数
+    loss_function = nn.CrossEntropyLoss()
     # 定义参数优化方法
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)  # 打散数据集合，其中20%用于测试，训练中不使用
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    training_data, test_data = shuffleData(data, TEST_RATE)  # 5600 1400 其中没有标签的有320个
+    training_data, valid_data, test_data = divideData(data, VALID_RATE, TEST_RATE)  # 4200 1400 1400
 
-    early_stop_count = 0    # 统计验证集上准确率连续没有提高的次数
-    pre_accurary = 0.0      # 记录该次训练之前模型最好的准确率
+    early_stop_count = 0        # 统计验证集上准确率连续没有提高的次数
+    pre_accurary = .0           # 记录该次训练之前模型最好的准确率
 
-    flag = 'normal'         # 是否正常完成训练
+    flag = 'normal'             # 是否正常完成训练
+
 
     for epoch in range(EPOCH):
-
-        # 每轮训练都打乱数据集，分为训练集和验证集合
-        tdata, vdata = shuffleData(training_data, VALID_RATE)
+        # 打乱训练集
+        tdata = shuffleData(training_data)
 
         # 在训练集上训练
-        train_step(tdata, word2ix, tag2ix, model, epoch)
+        train_step(tdata, word2ix, tag2ix, model, loss_function, epoch)
 
         # 在验证集上验证
-        accurary = evaluate(vdata, word2ix, tag2ix, model)
+        accurary = evaluate(valid_data, word2ix, tag2ix, model)
 
-        print '第%d轮，验证集分类准确率：%f' % (epoch + 1, accurary)
+        print '第%d轮，验证集分类准确率：%.4f' % (epoch + 1, accurary)
 
         # 如果分类器的准确率在验证集上多次没有提高，就early stop
         if EARLY_STOP:
@@ -163,7 +175,7 @@ for time in range(TRAIN_TIMES):
     test_acc = evaluate(test_data, word2ix, tag2ix, model)
 
     print '测试集准确率 %f' % test_acc
-    modelname = 'lstmClassifier-tag1-%s-%d-%f' % (flag, time, test_acc)
+    modelname = 'lstmClassifier-tag1-%s-%d-%.4f' % (flag, time, test_acc)
     outpath = '../trainedModel/%s.pkl' % modelname
     # 保存模型
     torch.save(model, outpath)
