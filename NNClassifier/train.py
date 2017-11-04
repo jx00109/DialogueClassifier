@@ -16,7 +16,7 @@ EPOCH = 1000                                # 训练次数
 EARLY_STOP = True                           # 是否启用early stop
 EARLY_STOP_THRESHOLD = 4                    # early stop的阈值
 LEARNING_RATE = 0.001                       # 学习率
-VALID_RATE = 0.2                            # 验证集占比
+VALID_RATE = 0.4                            # 验证集占比
 TEST_RATE = 0.2                             # 测试集占比
 TRAIN_TIMES = 10                            # 需要的模型总数
 LOG_DIR = '../logs/tag1-classifier.txt'     # 日志目录
@@ -91,7 +91,7 @@ def evaluate(data, word2ix, tag2ix, model):
 def train_step(data, word2ix, tag2ix, model, epoch):
     for i in range(len(data)):
         # 如果没有标签，就直接跳过
-        if tdata[i][1].strip() == '':
+        if data[i][1].strip() == '':
             continue
         if i % 500 == 0:
             print '第%d轮, 第%d个样本' % (epoch + 1, i + 1)
