@@ -12,16 +12,17 @@ torch.manual_seed(1)
 # ****************************参数设置**************************** #
 EMBEDDING_DIM = 100                             # 词向量维度
 HIDDEN_DIM = 100                                # LSTM隐藏层维度
-EPOCH = 100                                     # 训练次数
+EPOCH = 50                                      # 训练次数
 EARLY_STOP = True                               # 是否启用early stop
 EARLY_STOP_THRESHOLD = 4                        # early stop的阈值
 LEARNING_RATE = 0.001                           # 学习率
 VALID_RATE = 0.2                                # 验证集占比
 TEST_RATE = 0.2                                 # 测试集占比
 TRAIN_TIMES = 10                                # 需要的模型总数
-LOG_DIR = '../logs/tag1-classifier.txt'         # 日志目录
-DATA_DIR = '../data/alldata(fixed1).pkl'        # 数据目录
+LOG_DIR = '../logs/tag-classifier.txt'          # 日志目录
+DATA_DIR = '../data/alldata(fixed12).pkl'       # 数据目录
 TAG_DIR = '../data/tag12.pkl'                   # 分类标签来源
+TAG_LEVEL = 2                                   #分类级别
 # *************************************************************** #
 
 # 按比例得到训练集、验证集、测试集
@@ -55,7 +56,7 @@ def shuffleData(data):
 def preparexy(seq, word2ix, tag2ix):
     idxs = [word2ix[w] for w in seq[0].split()]
     x = idxs
-    y = tag2ix[seq[1]]
+    y = tag2ix[seq[TAG_LEVEL]]
     return x, y
 
 
@@ -65,6 +66,10 @@ def getWord2Ix(data):
         for word in sent.split():
             if word not in word2ix:
                 word2ix[word] = len(word2ix)
+
+    #加入 #UNK# 用于标记不在词典中的词
+    word2ix['#UNK#']=len(word2ix)
+
     return word2ix
 
 
@@ -76,13 +81,21 @@ def getTag2Index(tags):
             tag2ix[key] = len(tag2ix)
     return tag2ix
 
+# 获得二级分类
+def getTag2(tags):
+    tag2ix={}
+    for key in tags:
+        for each in tags[key]:
+            if each not in tag2ix:
+                tag2ix[each]=len(tag2ix)
+    return tag2ix
 
 # 计算模型准确率
 def evaluate(data, word2ix, tag2ix, model):
     count = .0  # 统计正确分类的样本数
     total = .0  # 统计样本总数
     for i in range(len(data)):
-        if data[i][1].strip() == '':
+        if data[i][TAG_LEVEL].strip() == '':
             continue
 
         testx, testy = preparexy(data[i], word2ix, tag2ix)
@@ -97,10 +110,10 @@ def evaluate(data, word2ix, tag2ix, model):
 
 
 # 训练
-def train_step(data, word2ix, tag2ix, model, loss_function, epoch):
+def train_step(data, word2ix, tag2ix, model, loss_function, optimizer, epoch):
     for i in range(len(data)):
         # 如果没有标签，就直接跳过
-        if data[i][1].strip() == '':
+        if data[i][TAG_LEVEL].strip() == '':
             continue
         if i % 500 == 0:
             print '第 %d 轮, 第 %d 个样本' % (epoch + 1, i + 1)
@@ -120,14 +133,17 @@ def train_step(data, word2ix, tag2ix, model, loss_function, epoch):
         optimizer.step()
 
 
-data = u.loadPickle(DATA_DIR)  # 载入数据集
-tag12 = u.loadPickle(TAG_DIR)  # 载入分类信息
+data = u.loadPickle(DATA_DIR)       # 载入数据集
+tag12 = u.loadPickle(TAG_DIR)       # 载入分类信息
 
-word2ix = getWord2Ix(data)      # 单词索引字典
-tag2ix = getTag2Index(tag12)    # 类别索引字典
+word2ix = getWord2Ix(data)          # 单词索引字典
+if TAG_LEVEL == 1:
+    tag2ix = getTag2Index(tag12)    # 一级类别索引字典
+else:
+    tag2ix = getTag2(tag12)         # 二级类别索引字典
 
-vocab_size = len(word2ix)       # 27003
-tags_size = len(tag2ix)         # 5
+vocab_size = len(word2ix)           # 27003
+tags_size = len(tag2ix)             # 5
 
 for time in range(TRAIN_TIMES):
     # 定义模型
@@ -144,13 +160,12 @@ for time in range(TRAIN_TIMES):
 
     flag = 'normal'             # 是否正常完成训练
 
-
     for epoch in range(EPOCH):
         # 打乱训练集
         tdata = shuffleData(training_data)
 
         # 在训练集上训练
-        train_step(tdata, word2ix, tag2ix, model, loss_function, epoch)
+        train_step(tdata, word2ix, tag2ix, model, loss_function, optimizer, epoch)
 
         # 在验证集上验证
         accurary = evaluate(valid_data, word2ix, tag2ix, model)
@@ -174,8 +189,8 @@ for time in range(TRAIN_TIMES):
     # 训练结束在测试集上进行测试
     test_acc = evaluate(test_data, word2ix, tag2ix, model)
 
-    print '测试集准确率 %f' % test_acc
-    modelname = 'lstmClassifier-tag1-%s-%d-%.4f' % (flag, time, test_acc)
+    print '测试集准确率 %.4f' % test_acc
+    modelname = 'lstmClassifier-tag%d-%s-%d-%.4f' % (TAG_LEVEL, flag, time, test_acc)
     outpath = '../trainedModel/%s.pkl' % modelname
     # 保存模型
     torch.save(model, outpath)
