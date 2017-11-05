@@ -62,4 +62,4 @@ def loadPickle(datapath):
 
 def saveModelAcc2txt(model, acc, outpath):
     with open(outpath, 'a') as f:
-        f.write('%s\t%f\n' % (model, acc))
+        f.write('%s\t%.4f\n' % (model, acc))
