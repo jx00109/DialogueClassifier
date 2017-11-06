@@ -9,21 +9,21 @@ import numpy as np
 
 torch.manual_seed(1)
 
-# ****************************参数设置**************************** #
-EMBEDDING_DIM = 100                             # 词向量维度
-HIDDEN_DIM = 100                                # LSTM隐藏层维度
-EPOCH = 50                                      # 训练次数
-EARLY_STOP = True                               # 是否启用early stop
-EARLY_STOP_THRESHOLD = 4                        # early stop的阈值
-LEARNING_RATE = 0.001                           # 学习率
-VALID_RATE = 0.2                                # 验证集占比
-TEST_RATE = 0.2                                 # 测试集占比
-TRAIN_TIMES = 10                                # 需要的模型总数
-LOG_DIR = '../logs/tag-classifier.txt'          # 日志目录
-DATA_DIR = '../data/alldata(fixed12).pkl'       # 数据目录
-TAG_DIR = '../data/tag12.pkl'                   # 分类标签来源
-TAG_LEVEL = 2                                   #分类级别
-# *************************************************************** #
+# ****************************参数设置********************************** #
+EMBEDDING_DIM = 100                                     # 词向量维度
+HIDDEN_DIM = 100                                        # LSTM隐藏层维度
+EPOCH = 50                                              # 训练次数
+EARLY_STOP = True                                       # 是否启用early stop
+EARLY_STOP_THRESHOLD = 4                                # early stop的阈值
+LEARNING_RATE = 0.001                                   # 学习率
+VALID_RATE = 0.2                                        # 验证集占比
+TEST_RATE = 0.2                                         # 测试集占比
+TRAIN_TIMES = 10                                        # 需要的模型总数
+LOG_DIR = '../logs/lstm-model-acc.txt'                  # 日志目录
+DATA_DIR = '../data/alldata(onlyEng-fixed12).pkl'       # 数据目录
+TAG_DIR = '../data/tag12.pkl'                           # 分类标签来源
+TAG_LEVEL = 2                                           #分类级别
+# ******************************************************************** #
 
 # 按比例得到训练集、验证集、测试集
 def divideData(data, vrate, trate):
@@ -31,9 +31,9 @@ def divideData(data, vrate, trate):
 
     sidx = np.random.permutation(nsamples)
 
-    nvalid = int(np.round(nsamples * vrate))    # 验证集数据量
-    ntest = int(np.round(nsamples * trate))     # 测试集数据量
-    ntrain = nsamples - nvalid - ntest          # 训练集数据量
+    nvalid = int(np.round(nsamples * vrate))            # 验证集数据量
+    ntest = int(np.round(nsamples * trate))             # 测试集数据量
+    ntrain = nsamples - nvalid - ntest                  # 训练集数据量
 
     train_data = [data[s] for s in sidx[:ntrain]]
     valid_data = [data[s] for s in sidx[ntrain:ntrain + nvalid]]
@@ -116,7 +116,7 @@ def train_step(data, word2ix, tag2ix, model, loss_function, optimizer, epoch):
         if data[i][TAG_LEVEL].strip() == '':
             continue
         if i % 500 == 0:
-            print '第 %d 轮, 第 %d 个样本' % (epoch + 1, i + 1)
+            print '第%d轮, 第%d个样本' % (epoch + 1, i + 1)
 
         # 得到输入和标签
         x, y = preparexy(data[i], word2ix, tag2ix)
@@ -142,8 +142,8 @@ if TAG_LEVEL == 1:
 else:
     tag2ix = getTag2(tag12)         # 二级类别索引字典
 
-vocab_size = len(word2ix)           # 27003
-tags_size = len(tag2ix)             # 5
+vocab_size = len(word2ix)
+tags_size = len(tag2ix)
 
 for time in range(TRAIN_TIMES):
     # 定义模型
@@ -153,12 +153,12 @@ for time in range(TRAIN_TIMES):
     # 定义参数优化方法
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    training_data, valid_data, test_data = divideData(data, VALID_RATE, TEST_RATE)  # 4200 1400 1400
+    training_data, valid_data, test_data = divideData(data, VALID_RATE, TEST_RATE)
 
-    early_stop_count = 0        # 统计验证集上准确率连续没有提高的次数
-    pre_accurary = .0           # 记录该次训练之前模型最好的准确率
+    early_stop_count = 0            # 统计验证集上准确率连续没有提高的次数
+    pre_accurary = .0               # 记录该次训练之前模型最好的准确率
 
-    flag = 'normal'             # 是否正常完成训练
+    flag = 'normal'                 # 是否正常完成训练
 
     for epoch in range(EPOCH):
         # 打乱训练集
@@ -190,8 +190,8 @@ for time in range(TRAIN_TIMES):
     test_acc = evaluate(test_data, word2ix, tag2ix, model)
 
     print '测试集准确率 %.4f' % test_acc
-    modelname = 'lstmClassifier-tag%d-%s-%d-%.4f' % (TAG_LEVEL, flag, time, test_acc)
-    outpath = '../trainedModel/%s.pkl' % modelname
+    modelname = 'lstmClassifier-level%d-%s-%d-%.4f' % (TAG_LEVEL, flag, time, test_acc)
+    outpath = '../trainedModel/lstm/%s.pkl' % modelname
     # 保存模型
     torch.save(model, outpath)
     # 在日志中记录本次训练的模型名称以及准确率
