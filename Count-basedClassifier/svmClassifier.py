@@ -5,16 +5,32 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
+import xlwt
 
-# **************************************参数设置********************************************* #
-TIMES = 10                                                  #训练的模型个数
-datapath = '../data/alldata(fixed12).pkl'                #数据源位置
-TAG_LEVEL = 2                                               #分类级别
-# ******************************************************************************************* #
+# **************************************参数设置******************************************** #
+TIMES = 10                                              # 训练的模型个数
+datapath = '../data/alldata(onlyEng-fixed12).pkl'       # 数据源位置
+TAG_LEVEL = 2                                           # 分类级别
+# ***************************************************************************************** #
+
+dataPath = r'../data/Berlinetta MLK 9.06.xlsx'
+
+
+rawData, rawDataRows, rawDataCols = u.openExcel(dataPath=dataPath, index=1)  # 9825 rows, 47 cols
+
+rawdata = list()
+
+for i in range(1, rawDataRows):                     # 跳过表头
+    r = rawData.row_values(i)
+    rawText = r[30]
+    text = u.replaceAllSymbols(r[30])
+    label1, label2, label3 = r[42], r[43], r[44]    # 获取对话内容以及对应的三级分类
+    if u.checkOnlyContainEnglish(text):             # 6152 rows, maxlen=572, minlen=2
+        rawdata.append([rawText.strip(), label1.lower(), label2.lower(), label3.lower()])
 
 
 # 按比例得到训练集、测试集
-def divideData(data, tag, trate):
+def divideData(rawdata, data, tag, trate):
     nsamples = len(data)
 
     sidx = np.random.permutation(nsamples)
@@ -22,38 +38,49 @@ def divideData(data, tag, trate):
 
     train_data = [data[s] for s in sidx[:ntrain]]
     train_tag = [tag[s] for s in sidx[:ntrain]]
+    train_raw = [rawdata[s][0] for s in sidx[:ntrain]]
     test_data = [data[s] for s in sidx[ntrain:]]
     test_tag = [tag[s] for s in sidx[ntrain:]]
+    test_raw = [rawdata[s][0] for s in sidx[ntrain:]]
 
-    return train_data, train_tag, test_data, test_tag
+    return train_data, train_tag, train_raw, test_data, test_tag, test_raw
+
 
 data = u.loadPickle(datapath)
-content = [d[0] for d in data]      # 文本
-tag1 = [d[1] for d in data]         # 一级分类
-tag2 = [d[2] for d in data]         # 二级分类
-tag3 = [d[3] for d in data]         # 三级分类
+rawdialogue = list()
+content = list()
+tag = list()
+for i, each in enumerate(data):         # 一级分类样本数5889 二级分类5887
+    if each[TAG_LEVEL].strip() == '':
+        continue
+    else:
+        rawdialogue.append(rawdata[i])
+        content.append(each[0])
+        tag.append(each[TAG_LEVEL])
 
-tags = [tag1, tag2, tag3]
 for i in range(TIMES):
-    tag = tags[TAG_LEVEL - 1]
-    train_content, train_tag, test_content, test_tag = divideData(content, tag, 0.2)
+    train_content, train_tag, train_raw, test_content, test_tag, test_raw = divideData(rawdialogue, content, tag, 0.2)
 
     vectorizer = CountVectorizer(encoding='unicode', stop_words='english')
     tfidftransformer = TfidfTransformer()
-    # tfidf = tfidftransformer.fit_transform(vectorizer.fit_transform(train_content))  # 先转换成词频矩阵，再计算TFIDF值
-    # print tfidf.shape #(5738, 23439)
 
     text_clf = Pipeline([('vect', vectorizer), ('tfidf', tfidftransformer), ('clf', SVC(C=0.99, kernel='linear'))])
     text_clf = text_clf.fit(train_content, train_tag)
     predicted = text_clf.predict(test_content)
-    acc=np.round(np.mean(predicted == test_tag), 4)
+    acc = np.round(np.mean(predicted == test_tag), 4)
     print 'SVM分类器的准确率: %.4f' % acc
-    modelname='svm-level%d-%d-%.4f' % (TAG_LEVEL, i, acc)
-    u.saveAsPickle(text_clf,'../trainedModel/svm/%s.pkl' % modelname)
+    modelname = 'svm-level%d-%d-%.4f' % (TAG_LEVEL, i, acc)
+    u.saveAsPickle(text_clf, '../trainedModel/svm/%s.pkl' % modelname)
     u.saveModelAcc2txt(modelname, acc, '../logs/svm-model-acc.txt')
-    # 随机选取测试集中的一条数据进行分类
-    ix = np.random.randint(1, 100)
-    # print ix
-    # print test_content[ix]
-    print test_tag[ix]
-    print text_clf.predict([test_content[ix]])
+
+    outpath = '../results/svm/%s.xls' % modelname
+    workbook = xlwt.Workbook(encoding='utf8')
+    worksheet = workbook.add_sheet('实验结果')
+
+    for i, each in enumerate(text_clf.predict(test_content)):
+        worksheet.write(i, 0, test_raw[i])              # 原始文本
+        worksheet.write(i, 1, test_content[i])          # 处理过的文本
+        worksheet.write(i, 2, test_tag[i])              # 原始标签
+        worksheet.write(i, 3, each)                     # 预测标签
+
+    workbook.save(outpath)
