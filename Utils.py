@@ -19,7 +19,7 @@ def replaceAllSymbols(oldStr):
     # 去掉数字
     oldStr = re.sub(mathsysmbols.decode("utf-8"), " ".decode("utf-8"), oldStr)
     # 再去掉符号
-    return re.sub(specialsymbols.decode("utf8"), " ".decode("utf8"), oldStr)
+    return re.sub(specialsymbols.decode("utf-8"), " ".decode("utf-8"), oldStr)
 
 
 # 检测是否含有中文
@@ -33,7 +33,7 @@ def checkContainChinese(check_str):
 def checkOnlyContainEnglish(check_str):
     if check_str.strip() == '':
         return False
-    for ch in check_str.decode('utf-8'):
+    for ch in check_str.encode('utf-8'):                #将原始数据编码回UTF-8
         if ch.isalpha() or ch.isdigit() or ch == ' ':
             continue
         else:
@@ -43,10 +43,10 @@ def checkOnlyContainEnglish(check_str):
 
 # 打开excel文件
 def openExcel(dataPath, index):
-    rawFile = xlrd.open_workbook(dataPath)  # 打开文件
-    rawData = rawFile.sheets()[index]  # 打开工作表
-    rawDataRows = rawData.nrows  # 9825
-    rawDataCols = rawData.ncols  # 47
+    rawFile = xlrd.open_workbook(dataPath)              # 打开文件
+    rawData = rawFile.sheets()[index]                   # 打开工作表
+    rawDataRows = rawData.nrows                         # 9825
+    rawDataCols = rawData.ncols                         # 47
     return rawData, rawDataRows, rawDataCols
 
 
