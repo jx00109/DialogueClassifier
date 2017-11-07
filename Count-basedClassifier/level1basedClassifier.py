@@ -26,6 +26,7 @@ def divideData(rawdata, data, tag, tag2, trate):
     train_tag = [tag[s] for s in sidx[:ntrain]]
     train_tag2 = [tag2[s] for s in sidx[:ntrain]]
     train_raw = [rawdata[s][0] for s in sidx[:ntrain]]
+
     test_data = [data[s] for s in sidx[ntrain:]]
     test_tag = [tag[s] for s in sidx[ntrain:]]
     test_tag2 = [tag2[s] for s in sidx[ntrain:]]
@@ -38,6 +39,7 @@ def divideData(rawdata, data, tag, tag2, trate):
 def getLevel2ClassIndex(c1, c2, tag12):
     all_tags = list()
     for each in c1:
+        print each
         tags = list()
         for tag in tag12[each]:
             i = np.argwhere(c2 == tag)
@@ -86,16 +88,20 @@ for i in range(TIMES):
     train_content, train_tag, train_tag2, train_raw, test_content, test_tag, test_tag2, test_raw = divideData(
         rawdialogue, content, tag, tag2, 0.2)
 
-    vectorizer = CountVectorizer(encoding='unicode', stop_words='english')
-    tfidftransformer = TfidfTransformer()
-    svc = SVC(probability=True, C=0.99, kernel='linear')
+    v_1 = CountVectorizer(encoding='unicode', stop_words='english')
+    t_1 = TfidfTransformer()
+    svc_1 = SVC(probability=True, C=0.99, kernel='linear')
+
+    v_2 = CountVectorizer(encoding='unicode', stop_words='english')
+    t_2 = TfidfTransformer()
+    svc_2 = SVC(probability=True, C=0.99, kernel='linear')
 
     # 一级分类器
     text_clf_1 = Pipeline(
-        [('vect', vectorizer), ('tfidf', tfidftransformer), ('clf', svc)])
+        [('vect', v_1), ('tfidf', t_1), ('clf', svc_1)])
     # 二级分类器
     text_clf_2 = Pipeline(
-        [('vect2', vectorizer), ('tfidf2', tfidftransformer), ('clf2', svc)])
+        [('vect2', v_2), ('tfidf2', t_2), ('clf2', svc_2)])
 
     # 独立训练一二级分类器
     text_clf_1 = text_clf_1.fit(train_content, train_tag)
