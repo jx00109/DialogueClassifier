@@ -12,6 +12,7 @@ TIMES = 10                                                  # 训练的模型个
 datapath = '../data/alldata(onlyEng-fixed12).pkl'           # 数据源位置
 tag12path = '../data/tag12.pkl'                             # 一二级字典
 dataPath = r'../data/Berlinetta MLK 9.06.xlsx'              # 原始文件
+TAG_LEVEL = 2                                               # 分类级别
 # ***************************************************************************************** #
 
 
@@ -39,7 +40,6 @@ def divideData(rawdata, data, tag, tag2, trate):
 def getLevel2ClassIndex(c1, c2, tag12):
     all_tags = list()
     for each in c1:
-        print each
         tags = list()
         for tag in tag12[each]:
             i = np.argwhere(c2 == tag)
@@ -49,10 +49,11 @@ def getLevel2ClassIndex(c1, c2, tag12):
     return all_tags
 
 # 根据一级分类结果调整二级分类概率分布
+# 调整了概率分布的指导方式p2'=p2*(1+p1)
 def adjustProba(p1,p2,tag22ix):
     for ir, prob1 in enumerate(p1):
         for it, each in enumerate(tag22ix):
-            p2[ir][each] = p2[ir][each] * prob1[it]
+            p2[ir][each] += p2[ir][each] * prob1[it]
     return p2
 
 rawData, rawDataRows, rawDataCols = u.openExcel(dataPath=dataPath, index=1)
@@ -123,7 +124,26 @@ for i in range(TIMES):
     # 修正的方式还需要考虑，该方式结果不好
     p2=adjustProba(p1,p2,tag22ix)
     predix2 = np.argmax(p2, axis=1)
-    acc2 = np.mean(c2[predix2] == test_tag2)
+    acc = np.mean(c2[predix2] == test_tag2)
 
-    print 'SVM分类器的准确率: %.4f' % acc2
+    print 'SVM分类器的准确率: %.4f' % acc
+    modelname = '1based-svm-%d' % i
+    modelname1 = 'svm1-level%d-%d-%.4f' % (TAG_LEVEL, i, acc)
+    modelname2 = 'svm2-level%d-%d-%.4f' % (TAG_LEVEL, i, acc)
+    u.saveAsPickle(text_clf_1, '../trainedModel/1based-svm/%s.pkl' % modelname1)
+    u.saveAsPickle(text_clf_2, '../trainedModel/1based-svm/%s.pkl' % modelname2)
+
+    u.saveModelAcc2txt(modelname, acc, '../logs/svm-model-acc.txt')
+
+    outpath = '../results/svm/%s.xls' % modelname
+    workbook = xlwt.Workbook(encoding='utf8')
+    worksheet = workbook.add_sheet('实验结果')
+
+    for i, each in enumerate(c2[predix2]):
+        worksheet.write(i, 0, test_raw[i])  # 原始文本
+        worksheet.write(i, 1, test_content[i])  # 处理过的文本
+        worksheet.write(i, 2, test_tag[i])  # 原始标签
+        worksheet.write(i, 3, each)  # 预测标签
+
+    workbook.save(outpath)
 
