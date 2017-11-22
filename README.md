@@ -1,5 +1,7 @@
 # DialogueClassifier
 通过分析客户和客服对话，对客户的问题进行一些分类。
+具体介绍可以查看CSDN博客，地址如下：
+http://blog.csdn.net/sinat_31188625/article/details/78490209
 
 ## 实验方法
 1. 基于SVM的分类方法
